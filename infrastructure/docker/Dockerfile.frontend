@@ -1,0 +1,15 @@
+FROM node:20-alpine
+
+ARG APP_PATH
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+COPY pnpm-lock.yaml* pnpm-workspace.yaml package.json ./
+COPY ${APP_PATH}/ ./${APP_PATH}/
+
+RUN pnpm install
+
+WORKDIR /app/${APP_PATH}
+EXPOSE 3000 3001 3002
+CMD ["pnpm", "dev", "--host"]

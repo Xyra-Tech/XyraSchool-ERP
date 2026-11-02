@@ -1,0 +1,1277 @@
+// =============================================================================
+// XyraTech School ERP — Platform Database Schema (Phase 2 Extended)
+// =============================================================================
+// This schema covers the XyraTech Control Center platform management system.
+// School-specific operational data lives in the separate school database schema.
+// =============================================================================
+
+datasource db {
+  provider = "postgresql"
+  url      = env("PLATFORM_DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../client"
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum PlatformRoleName {
+  SUPER_ADMIN
+  PLATFORM_ADMINISTRATOR
+  FINANCE_MANAGER
+  SUBSCRIPTION_MANAGER
+  DEPLOYMENT_ENGINEER
+  RELEASE_MANAGER
+  SUPPORT_MANAGER
+  SUPPORT_AGENT
+  CONTENT_MANAGER
+  SECURITY_ADMINISTRATOR
+  BUSINESS_ANALYST
+}
+
+enum SchoolStatus {
+  PENDING_APPROVAL
+  APPROVED
+  PROVISIONING
+  PENDING_ACTIVATION
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+  ARCHIVED
+}
+
+enum OnboardingSource {
+  ONLINE_APPLICATION
+  MANUAL_ENTRY
+}
+
+enum OnboardingStatus {
+  APPLICATION_SUBMITTED
+  VERIFICATION_PENDING
+  DOCUMENT_REVIEW
+  APPROVED
+  REJECTED
+  DEPLOYMENT_PROVISIONING
+  DEPLOYMENT_HEALTH_CHECK
+  PRINCIPAL_INVITATION_SENT
+  SCHOOL_ACTIVATED
+}
+
+enum VerificationDocStatus {
+  UPLOADED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  REUPLOAD_REQUESTED
+}
+
+enum DeploymentEnvironment {
+  DEVELOPMENT
+  STAGING
+  PRODUCTION
+}
+
+enum DeploymentStatus {
+  NOT_STARTED
+  QUEUED
+  PROVISIONING
+  DEPLOYING
+  MIGRATING
+  HEALTH_CHECK
+  HEALTHY
+  FAILED
+  MAINTENANCE
+  SUSPENDED
+  DECOMMISSIONING
+  DECOMMISSIONED
+}
+
+enum DeploymentJobType {
+  PROVISION
+  DEPLOY
+  MIGRATE
+  HEALTH_CHECK
+  UPDATE
+  ROLLBACK
+  MAINTENANCE_ON
+  MAINTENANCE_OFF
+  SUSPEND
+  REACTIVATE
+  DECOMMISSION
+}
+
+enum DeploymentJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  RETRYING
+}
+
+enum BillingCycle {
+  MONTHLY
+  QUARTERLY
+  HALF_YEARLY
+  ANNUAL
+  CUSTOM
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAYMENT_PENDING
+  OVERDUE
+  GRACE_PERIOD
+  RESTRICTED
+  SUSPENDED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  PARTIALLY_PAID
+  OVERDUE
+  CANCELLED
+  REFUNDED
+  VOID
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentMethod {
+  RAZORPAY
+  BANK_TRANSFER
+  CHEQUE
+  CASH
+  MANUAL
+}
+
+enum RefundStatus {
+  REQUESTED
+  APPROVED
+  PROCESSING
+  COMPLETED
+  REJECTED
+  FAILED
+}
+
+enum ReleaseStatus {
+  DRAFT
+  TESTING
+  APPROVED
+  SCHEDULED
+  ROLLING_OUT
+  COMPLETED
+  FAILED
+  ROLLED_BACK
+  DEPRECATED
+}
+
+enum TicketCategory {
+  TECHNICAL_ISSUE
+  LOGIN_ACCESS
+  BILLING
+  DEPLOYMENT
+  FEATURE_REQUEST
+  DATA_ISSUE
+  SECURITY_INCIDENT
+  GENERAL_INQUIRY
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TicketStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  WAITING_FOR_SCHOOL
+  WAITING_FOR_INTERNAL
+  ESCALATED
+  RESOLVED
+  CLOSED
+}
+
+enum SupportAccessStatus {
+  REQUESTED
+  APPROVED
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum CMSPageStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  PUBLISHED
+  SCHEDULED
+  ARCHIVED
+}
+
+enum AnnouncementType {
+  GENERAL
+  MAINTENANCE
+  RELEASE_UPDATE
+  SECURITY_ADVISORY
+  BILLING_REMINDER
+  PRODUCT_UPDATE
+  EMERGENCY_NOTICE
+}
+
+enum AnnouncementStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  PUBLISHED
+  SCHEDULED
+  EXPIRED
+  ARCHIVED
+}
+
+enum AlertCategory {
+  SCHOOL_ONBOARDING
+  PAYMENT_FAILURE
+  SUBSCRIPTION_EXPIRY
+  DEPLOYMENT_FAILURE
+  RELEASE_FAILURE
+  INFRASTRUCTURE_OUTAGE
+  SECURITY_INCIDENT
+  SUPPORT_SLA_BREACH
+  BACKUP_FAILURE
+  AI_QUOTA_THRESHOLD
+}
+
+enum AlertSeverity {
+  INFORMATIONAL
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertStatus {
+  TRIGGERED
+  ACKNOWLEDGED
+  INVESTIGATING
+  RESOLVED
+  ESCALATED
+  DISMISSED
+}
+
+enum AuditOutcome {
+  SUCCESS
+  FAILURE
+}
+
+// =============================================================================
+// PLATFORM USERS & ROLES (Phase 1 extended)
+// =============================================================================
+
+model PlatformUser {
+  id                  String    @id @default(uuid())
+  email               String    @unique
+  passwordHash        String
+  firstName           String
+  lastName            String
+  phoneNumber         String?
+  isActive            Boolean   @default(true)
+  isSuperAdmin        Boolean   @default(false)
+  mfaEnabled          Boolean   @default(false)
+  mfaSecret           String?
+  lastLoginAt         DateTime?
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  departmentId        String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  department          InternalDepartment?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  userRoles           PlatformUserRole[]
+  auditLogs           PlatformAuditLog[]     @relation("AuditActor")
+  assignedTickets     SupportTicket[]        @relation("TicketAssignee")
+  supportAccessGrants SupportAccessRequest[] @relation("AccessGrantor")
+  supportSessions     SupportAccessSession[] @relation("SessionAgent")
+  createdAlerts       PlatformAlert[]        @relation("AlertCreator")
+  refreshTokens       PlatformRefreshToken[]
+
+  @@map("platform_users")
+}
+
+model PlatformRefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  ipAddress String?
+  userAgent String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user PlatformUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@map("platform_refresh_tokens")
+}
+
+model PlatformRole {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  displayName String?
+  description String?
+  isSystem    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userRoles   PlatformUserRole[]
+  permissions PlatformRolePermission[]
+
+  @@map("platform_roles")
+}
+
+model PlatformPermission {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  description String?
+  module      String
+  createdAt   DateTime @default(now())
+
+  rolePermissions PlatformRolePermission[]
+
+  @@map("platform_permissions")
+}
+
+model PlatformUserRole {
+  platformUserId String
+  platformRoleId String
+  assignedAt     DateTime @default(now())
+
+  platformUser PlatformUser @relation(fields: [platformUserId], references: [id], onDelete: Cascade)
+  platformRole PlatformRole @relation(fields: [platformRoleId], references: [id], onDelete: Cascade)
+
+  @@id([platformUserId, platformRoleId])
+  @@map("platform_user_roles")
+}
+
+model PlatformRolePermission {
+  platformRoleId       String
+  platformPermissionId String
+
+  platformRole       PlatformRole       @relation(fields: [platformRoleId], references: [id], onDelete: Cascade)
+  platformPermission PlatformPermission @relation(fields: [platformPermissionId], references: [id], onDelete: Cascade)
+
+  @@id([platformRoleId, platformPermissionId])
+  @@map("platform_role_permissions")
+}
+
+model InternalDepartment {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members PlatformUser[]
+
+  @@map("internal_departments")
+}
+
+// =============================================================================
+// SCHOOL MANAGEMENT & ONBOARDING
+// =============================================================================
+
+model School {
+  id                   String       @id @default(uuid())
+  code                 String       @unique
+  name                 String
+  schoolType           String?
+  officialEmail        String       @unique
+  contactPhone         String
+  address              String?
+  city                 String?
+  state                String?
+  postalCode           String?
+  country              String       @default("India")
+  expectedStudentCount Int?
+  status               SchoolStatus @default(PENDING_APPROVAL)
+  domain               String?      @unique
+  activatedAt          DateTime?
+  suspendedAt          DateTime?
+  cancelledAt          DateTime?
+  cancellationReason   String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  application         SchoolApplication?
+  contacts            SchoolContact[]
+  deployments         SchoolDeployment[]
+  subscriptions       SchoolSubscription[]
+  branding            SchoolBranding?
+  supportTickets      SupportTicket[]
+  releaseDeployments  ReleaseDeployment[]
+  announcementTargets AnnouncementTarget[]
+
+  @@index([status])
+  @@index([name])
+  @@index([city, state])
+  @@map("schools")
+}
+
+model SchoolApplication {
+  id       String           @id @default(uuid())
+  schoolId String?          @unique
+  source   OnboardingSource @default(ONLINE_APPLICATION)
+  status   OnboardingStatus @default(APPLICATION_SUBMITTED)
+
+  // Application form data
+  schoolName           String
+  schoolType           String?
+  address              String?
+  city                 String?
+  state                String?
+  postalCode           String?
+  contactPhone         String
+  officialEmail        String
+  principalName        String
+  principalEmail       String
+  principalPhone       String?
+  expectedStudentCount Int?
+  requestedPlanCode    String?
+  requestedModules     String[] @default([])
+  notes                String?
+
+  // Review tracking
+  assignedToId    String?
+  approvedById    String?
+  rejectedById    String?
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  rejectionReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school    School?                      @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  documents SchoolVerificationDocument[]
+  reviews   OnboardingReview[]
+
+  @@index([status])
+  @@index([officialEmail])
+  @@map("school_applications")
+}
+
+model SchoolVerificationDocument {
+  id            String                @id @default(uuid())
+  applicationId String
+  documentType  String
+  fileName      String
+  fileUrl       String
+  fileSizeBytes Int?
+  mimeType      String?
+  status        VerificationDocStatus @default(UPLOADED)
+  reviewNotes   String?
+  reviewedById  String?
+  reviewedAt    DateTime?
+  uploadedAt    DateTime              @default(now())
+
+  application SchoolApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@map("school_verification_documents")
+}
+
+model OnboardingReview {
+  id            String   @id @default(uuid())
+  applicationId String
+  reviewerId    String
+  reviewerEmail String?
+  action        String // SUBMITTED, VERIFIED, INFO_REQUESTED, APPROVED, REJECTED
+  comment       String?
+  createdAt     DateTime @default(now())
+
+  application SchoolApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@map("onboarding_reviews")
+}
+
+model SchoolContact {
+  id          String   @id @default(uuid())
+  schoolId    String
+  contactType String // PRIMARY, BILLING, TECHNICAL, PRINCIPAL
+  name        String
+  email       String
+  phone       String?
+  isPrimary   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@map("school_contacts")
+}
+
+// =============================================================================
+// DEPLOYMENT MANAGEMENT
+// =============================================================================
+
+model SchoolDeployment {
+  id                   String                @id @default(uuid())
+  schoolId             String
+  environment          DeploymentEnvironment @default(PRODUCTION)
+  status               DeploymentStatus      @default(NOT_STARTED)
+  deploymentUrl        String?
+  databaseUrlEncrypted String?
+  storageBucket        String?
+  apiVersion           String                @default("v1")
+  releaseVersion       String                @default("1.0.0")
+  lastHealthCheckAt    DateTime?
+  maintenanceStartedAt DateTime?
+  maintenanceReason    String?
+  configJson           Json?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  school       School                  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  jobs         DeploymentJob[]
+  events       DeploymentEvent[]
+  healthChecks DeploymentHealthCheck[]
+
+  @@unique([schoolId, environment])
+  @@index([status])
+  @@map("school_deployments")
+}
+
+model DeploymentJob {
+  id            String              @id @default(uuid())
+  deploymentId  String
+  jobType       DeploymentJobType
+  status        DeploymentJobStatus @default(PENDING)
+  targetVersion String?
+  parameters    Json?
+  result        Json?
+  errorMessage  String?
+  attemptCount  Int                 @default(0)
+  maxAttempts   Int                 @default(3)
+  startedAt     DateTime?
+  completedAt   DateTime?
+  scheduledAt   DateTime?
+  expiresAt     DateTime?
+  initiatedById String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  deployment SchoolDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+
+  @@index([deploymentId, status])
+  @@index([status, scheduledAt])
+  @@map("deployment_jobs")
+}
+
+model DeploymentEvent {
+  id           String   @id @default(uuid())
+  deploymentId String
+  eventType    String
+  message      String
+  details      Json?
+  severity     String   @default("INFO") // INFO, WARN, ERROR
+  createdAt    DateTime @default(now())
+
+  deployment SchoolDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+
+  @@index([deploymentId, createdAt])
+  @@map("deployment_events")
+}
+
+model DeploymentHealthCheck {
+  id             String   @id @default(uuid())
+  deploymentId   String
+  checkType      String // API, DATABASE, STORAGE, OVERALL
+  isHealthy      Boolean
+  responseTimeMs Int?
+  details        Json?
+  checkedAt      DateTime @default(now())
+
+  deployment SchoolDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+
+  @@index([deploymentId, checkedAt])
+  @@map("deployment_health_checks")
+}
+
+// =============================================================================
+// SUBSCRIPTIONS, PLANS & ENTITLEMENTS
+// =============================================================================
+
+model SubscriptionPlan {
+  id             String       @id @default(uuid())
+  code           String       @unique
+  name           String
+  description    String?
+  billingCycle   BillingCycle @default(ANNUAL)
+  maxStudents    Int          @default(500)
+  maxStaff       Int          @default(50)
+  maxAdmins      Int          @default(5)
+  storageLimitMb Int          @default(10240)
+  aiUsageQuota   Int?
+  parentPortal   Boolean      @default(true)
+  mobileAccess   Boolean      @default(true)
+  supportLevel   String       @default("STANDARD") // BASIC, STANDARD, PRIORITY, DEDICATED
+  priceInCents   Int          @default(0)
+  currency       String       @default("INR")
+  isActive       Boolean      @default(true)
+  isCustom       Boolean      @default(false)
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  entitlements  FeatureEntitlement[]
+  subscriptions SchoolSubscription[]
+
+  @@map("subscription_plans")
+}
+
+model FeatureEntitlement {
+  id          String   @id @default(uuid())
+  planId      String
+  featureCode String
+  featureName String?
+  isEnabled   Boolean  @default(true)
+  limitValue  Int?
+  effectiveAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  plan SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, featureCode])
+  @@map("feature_entitlements")
+}
+
+model SchoolSubscription {
+  id                  String             @id @default(uuid())
+  schoolId            String
+  planId              String
+  status              SubscriptionStatus @default(ACTIVE)
+  billingCycle        BillingCycle       @default(ANNUAL)
+  startDate           DateTime           @default(now())
+  endDate             DateTime
+  trialEndsAt         DateTime?
+  renewalDate         DateTime?
+  autoRenew           Boolean            @default(true)
+  agreedPriceInCents  Int?
+  discountPercent     Float?             @default(0)
+  taxPercent          Float?             @default(18) // GST
+  billingContactName  String?
+  billingContactEmail String?
+  billingContactPhone String?
+  notes               String?
+  cancelledAt         DateTime?
+  cancellationReason  String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  school   School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  plan     SubscriptionPlan      @relation(fields: [planId], references: [id], onDelete: Restrict)
+  invoices SubscriptionInvoice[]
+  history  SubscriptionHistory[]
+
+  @@index([schoolId])
+  @@index([status])
+  @@index([endDate])
+  @@map("school_subscriptions")
+}
+
+model SubscriptionHistory {
+  id             String   @id @default(uuid())
+  subscriptionId String
+  action         String // CREATED, UPGRADED, DOWNGRADED, RENEWED, CANCELLED, SUSPENDED, REACTIVATED
+  fromPlanId     String?
+  toPlanId       String?
+  fromStatus     String?
+  toStatus       String?
+  changedById    String?
+  reason         String?
+  details        Json?
+  createdAt      DateTime @default(now())
+
+  subscription SchoolSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId, createdAt])
+  @@map("subscription_history")
+}
+
+// =============================================================================
+// BILLING & PAYMENTS
+// =============================================================================
+
+model SubscriptionInvoice {
+  id              String        @id @default(uuid())
+  invoiceNumber   String        @unique
+  subscriptionId  String
+  status          InvoiceStatus @default(DRAFT)
+  subtotalInCents Int
+  discountInCents Int           @default(0)
+  taxInCents      Int           @default(0)
+  totalInCents    Int
+  currency        String        @default("INR")
+  periodStart     DateTime
+  periodEnd       DateTime
+  dueDate         DateTime
+  issuedAt        DateTime?
+  paidAt          DateTime?
+  lineItems       Json?
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  subscription SchoolSubscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  payments     PaymentTransaction[]
+  refunds      Refund[]
+
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("subscription_invoices")
+}
+
+model PaymentTransaction {
+  id                      String        @id @default(uuid())
+  invoiceId               String
+  externalPaymentId       String?       @unique // Razorpay payment_id
+  externalOrderId         String? // Razorpay order_id
+  method                  PaymentMethod @default(RAZORPAY)
+  status                  PaymentStatus @default(PENDING)
+  amountInCents           Int
+  currency                String        @default("INR")
+  gatewayResponse         Json?
+  webhookPayload          Json?
+  verifiedAt              DateTime?
+  manualVerifiedById      String?
+  manualVerificationNotes String?
+  failureReason           String?
+  idempotencyKey          String?       @unique
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+
+  invoice SubscriptionInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([status])
+  @@index([externalPaymentId])
+  @@map("payment_transactions")
+}
+
+model Refund {
+  id               String       @id @default(uuid())
+  invoiceId        String
+  paymentId        String?
+  externalRefundId String?      @unique
+  status           RefundStatus @default(REQUESTED)
+  amountInCents    Int
+  currency         String       @default("INR")
+  reason           String
+  requestedById    String
+  approvedById     String?
+  processedAt      DateTime?
+  gatewayResponse  Json?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  invoice SubscriptionInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([status])
+  @@map("refunds")
+}
+
+// =============================================================================
+// RELEASE MANAGEMENT
+// =============================================================================
+
+model Release {
+  id                  String        @id @default(uuid())
+  version             String        @unique
+  title               String
+  description         String?
+  releaseNotes        String?
+  status              ReleaseStatus @default(DRAFT)
+  isHotfix            Boolean       @default(false)
+  requiresDbMigration Boolean       @default(false)
+  migrationNotes      String?
+  artifactUrl         String?
+  createdById         String
+  approvedById        String?
+  approvedAt          DateTime?
+  scheduledAt         DateTime?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  failedAt            DateTime?
+  rollbackVersion     String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  artifacts   ReleaseArtifact[]
+  deployments ReleaseDeployment[]
+
+  @@index([status])
+  @@index([version])
+  @@map("releases")
+}
+
+model ReleaseArtifact {
+  id            String   @id @default(uuid())
+  releaseId     String
+  fileName      String
+  fileUrl       String
+  fileSizeBytes Int?
+  checksum      String?
+  artifactType  String   @default("BUILD") // BUILD, MIGRATION, CONFIG, DOCS
+  createdAt     DateTime @default(now())
+
+  release Release @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+
+  @@index([releaseId])
+  @@map("release_artifacts")
+}
+
+model ReleaseDeployment {
+  id              String    @id @default(uuid())
+  releaseId       String
+  schoolId        String
+  previousVersion String?
+  targetVersion   String
+  status          String    @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, FAILED, SKIPPED, ROLLED_BACK
+  isPilot         Boolean   @default(false)
+  startedAt       DateTime?
+  completedAt     DateTime?
+  errorMessage    String?
+  rollbackAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  release Release @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([releaseId, schoolId])
+  @@index([releaseId, status])
+  @@map("release_deployments")
+}
+
+// =============================================================================
+// SUPPORT CENTER
+// =============================================================================
+
+model SupportTicket {
+  id                   String         @id @default(uuid())
+  ticketNumber         String         @unique
+  schoolId             String?
+  requesterName        String
+  requesterEmail       String
+  category             TicketCategory @default(GENERAL_INQUIRY)
+  priority             TicketPriority @default(MEDIUM)
+  status               TicketStatus   @default(OPEN)
+  subject              String
+  description          String
+  assignedToId         String?
+  assignedTeam         String?
+  slaResponseDue       DateTime?
+  slaResolutionDue     DateTime?
+  respondedAt          DateTime?
+  resolvedAt           DateTime?
+  closedAt             DateTime?
+  satisfactionRating   Int? // 1-5
+  satisfactionFeedback String?
+  escalatedAt          DateTime?
+  escalationLevel      Int            @default(0)
+  tags                 String[]       @default([])
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  school         School?                @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  assignedTo     PlatformUser?          @relation("TicketAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  messages       SupportMessage[]
+  attachments    SupportAttachment[]
+  accessRequests SupportAccessRequest[]
+
+  @@index([schoolId])
+  @@index([status])
+  @@index([priority, status])
+  @@index([assignedToId])
+  @@index([ticketNumber])
+  @@map("support_tickets")
+}
+
+model SupportMessage {
+  id          String   @id @default(uuid())
+  ticketId    String
+  senderType  String // AGENT, SCHOOL, SYSTEM
+  senderId    String?
+  senderName  String
+  senderEmail String?
+  content     String
+  isInternal  Boolean  @default(false) // Internal notes not visible to school
+  createdAt   DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+  @@map("support_messages")
+}
+
+model SupportAttachment {
+  id            String   @id @default(uuid())
+  ticketId      String
+  messageId     String?
+  fileName      String
+  fileUrl       String
+  fileSizeBytes Int?
+  mimeType      String?
+  uploadedById  String?
+  uploadedAt    DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@map("support_attachments")
+}
+
+model SupportAccessRequest {
+  id               String              @id @default(uuid())
+  ticketId         String?
+  schoolId         String
+  requestedById    String
+  purpose          String
+  scopeDescription String
+  accessLevel      String              @default("READ_ONLY") // READ_ONLY, READ_WRITE
+  status           SupportAccessStatus @default(REQUESTED)
+  approvedById     String?
+  approvedAt       DateTime?
+  expiresAt        DateTime?
+  revokedAt        DateTime?
+  revokedReason    String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  ticket     SupportTicket?         @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  approvedBy PlatformUser?          @relation("AccessGrantor", fields: [approvedById], references: [id], onDelete: SetNull)
+  sessions   SupportAccessSession[]
+
+  @@index([schoolId, status])
+  @@index([status])
+  @@map("support_access_requests")
+}
+
+model SupportAccessSession {
+  id               String    @id @default(uuid())
+  accessRequestId  String
+  agentId          String
+  startedAt        DateTime  @default(now())
+  endedAt          DateTime?
+  actionsPerformed Json?
+  ipAddress        String?
+
+  accessRequest SupportAccessRequest @relation(fields: [accessRequestId], references: [id], onDelete: Cascade)
+  agent         PlatformUser         @relation("SessionAgent", fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([accessRequestId])
+  @@map("support_access_sessions")
+}
+
+// =============================================================================
+// CMS & BRANDING
+// =============================================================================
+
+model CMSPage {
+  id              String        @id @default(uuid())
+  slug            String        @unique
+  title           String
+  pageType        String        @default("PAGE") // PAGE, BLOG, FAQ, HELP
+  content         Json?
+  metaTitle       String?
+  metaDescription String?
+  metaKeywords    String?
+  featuredImage   String?
+  template        String?
+  status          CMSPageStatus @default(DRAFT)
+  publishedAt     DateTime?
+  scheduledAt     DateTime?
+  expiresAt       DateTime?
+  authorId        String?
+  reviewedById    String?
+  approvedById    String?
+  sortOrder       Int           @default(0)
+  parentId        String?
+  locale          String        @default("en")
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  blocks    CMSBlock[]
+  revisions CMSRevision[]
+
+  @@index([status])
+  @@index([pageType])
+  @@index([slug])
+  @@map("cms_pages")
+}
+
+model CMSBlock {
+  id        String   @id @default(uuid())
+  pageId    String
+  blockType String // HERO, TEXT, IMAGE, CTA, FAQ, TESTIMONIAL, FEATURE_GRID, CODE, VIDEO
+  content   Json
+  sortOrder Int      @default(0)
+  isVisible Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  page CMSPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, sortOrder])
+  @@map("cms_blocks")
+}
+
+model CMSMedia {
+  id            String   @id @default(uuid())
+  fileName      String
+  fileUrl       String
+  fileSizeBytes Int?
+  mimeType      String?
+  altText       String?
+  category      String?
+  uploadedById  String?
+  createdAt     DateTime @default(now())
+
+  @@index([category])
+  @@map("cms_media")
+}
+
+model CMSRevision {
+  id          String   @id @default(uuid())
+  pageId      String
+  content     Json
+  title       String
+  changedById String?
+  changeNote  String?
+  version     Int
+  createdAt   DateTime @default(now())
+
+  page CMSPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, version])
+  @@map("cms_revisions")
+}
+
+model SchoolBranding {
+  id               String    @id @default(uuid())
+  schoolId         String    @unique
+  logoUrl          String?
+  primaryColor     String    @default("#1976d2")
+  secondaryColor   String    @default("#dc004e")
+  loginBannerUrl   String?
+  dashboardLogoUrl String?
+  contactInfo      Json?
+  isPublished      Boolean   @default(false)
+  publishedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@map("school_brandings")
+}
+
+// =============================================================================
+// ANNOUNCEMENTS & NOTIFICATIONS
+// =============================================================================
+
+model Announcement {
+  id           String             @id @default(uuid())
+  title        String
+  content      String
+  type         AnnouncementType   @default(GENERAL)
+  status       AnnouncementStatus @default(DRAFT)
+  priority     String             @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
+  channels     String[]           @default(["IN_APP"])
+  authorId     String?
+  approvedById String?
+  publishedAt  DateTime?
+  scheduledAt  DateTime?
+  expiresAt    DateTime?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  targets AnnouncementTarget[]
+
+  @@index([status])
+  @@index([type])
+  @@map("announcements")
+}
+
+model AnnouncementTarget {
+  id             String    @id @default(uuid())
+  announcementId String
+  targetType     String // ALL_SCHOOLS, SPECIFIC_SCHOOL, PLAN, VERSION, INTERNAL
+  targetValue    String? // schoolId, planCode, version, departmentId
+  schoolId       String?
+  deliveredAt    DateTime?
+  readAt         DateTime?
+
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  school       School?      @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+
+  @@index([announcementId])
+  @@map("announcement_targets")
+}
+
+model PlatformNotification {
+  id        String    @id @default(uuid())
+  userId    String?
+  title     String
+  message   String
+  channel   String    @default("IN_APP") // IN_APP, EMAIL, SMS, WHATSAPP
+  category  String?
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+  actionUrl String?
+  metadata  Json?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("platform_notifications")
+}
+
+// =============================================================================
+// ALERTS & MONITORING
+// =============================================================================
+
+model PlatformAlert {
+  id               String        @id @default(uuid())
+  category         AlertCategory
+  severity         AlertSeverity @default(MEDIUM)
+  status           AlertStatus   @default(TRIGGERED)
+  title            String
+  message          String
+  resourceType     String?
+  resourceId       String?
+  metadata         Json?
+  assignedToId     String?
+  acknowledgedAt   DateTime?
+  acknowledgedById String?
+  resolvedAt       DateTime?
+  resolvedById     String?
+  resolvedNotes    String?
+  escalatedAt      DateTime?
+  escalationLevel  Int           @default(0)
+  deduplicationKey String?
+  createdById      String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  createdBy PlatformUser?        @relation("AlertCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  events    PlatformAlertEvent[]
+
+  @@index([status, severity])
+  @@index([category])
+  @@index([deduplicationKey])
+  @@map("platform_alerts")
+}
+
+model PlatformAlertEvent {
+  id         String   @id @default(uuid())
+  alertId    String
+  eventType  String // TRIGGERED, ACKNOWLEDGED, ESCALATED, RESOLVED, DISMISSED, NOTE_ADDED
+  actorId    String?
+  actorEmail String?
+  message    String?
+  createdAt  DateTime @default(now())
+
+  alert PlatformAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+
+  @@index([alertId, createdAt])
+  @@map("platform_alert_events")
+}
+
+// =============================================================================
+// ANALYTICS
+// =============================================================================
+
+model PlatformAnalyticsSnapshot {
+  id           String   @id @default(uuid())
+  snapshotType String // DAILY, WEEKLY, MONTHLY
+  snapshotDate DateTime
+  metrics      Json // Flexible JSON metrics blob
+  category     String // SCHOOLS, SUBSCRIPTIONS, REVENUE, DEPLOYMENTS, SUPPORT, USAGE
+  createdAt    DateTime @default(now())
+
+  @@unique([snapshotType, snapshotDate, category])
+  @@index([snapshotDate])
+  @@map("platform_analytics_snapshots")
+}
+
+// =============================================================================
+// PLATFORM SETTINGS
+// =============================================================================
+
+model PlatformSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       Json
+  category    String   @default("GENERAL")
+  isSecret    Boolean  @default(false)
+  description String?
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@index([category])
+  @@map("platform_settings")
+}
+
+// =============================================================================
+// AUDIT LOG (Phase 1 extended)
+// =============================================================================
+
+model PlatformAuditLog {
+  id           String       @id @default(uuid())
+  actorId      String?
+  actorEmail   String?
+  action       String
+  resourceType String
+  resourceId   String?
+  outcome      AuditOutcome @default(SUCCESS)
+  ipAddress    String?
+  userAgent    String?
+  details      Json?
+  requestId    String?
+  sessionId    String?
+  duration     Int? // milliseconds
+  timestamp    DateTime     @default(now())
+
+  platformUser PlatformUser? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([action])
+  @@index([resourceType, resourceId])
+  @@index([timestamp])
+  @@index([actorId])
+  @@map("platform_audit_logs")
+}

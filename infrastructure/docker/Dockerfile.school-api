@@ -1,0 +1,21 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+COPY pnpm-lock.yaml* pnpm-workspace.yaml package.json ./
+COPY packages/ ./packages/
+COPY services/school-api/ ./services/school-api/
+
+RUN pnpm install --frozen-lockfile || pnpm install
+RUN pnpm --filter @xyratech/database generate
+RUN pnpm --filter @xyratech/shared-types build
+RUN pnpm --filter @xyratech/validation build
+RUN pnpm --filter @xyratech/permissions build
+RUN pnpm --filter @xyratech/config build
+RUN pnpm --filter @xyratech/database build
+RUN pnpm --filter @xyratech/school-api build
+
+EXPOSE 5000
+CMD ["pnpm", "--filter", "@xyratech/school-api", "start"]

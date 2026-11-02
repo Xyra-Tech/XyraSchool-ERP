@@ -1,0 +1,36 @@
+{
+  "name": "@xyratech/database",
+  "version": "1.0.0",
+  "private": true,
+  "description": "XyraTech Database - Prisma schemas and clients for platform and school databases",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "generate": "pnpm run generate:platform && pnpm run generate:school",
+    "generate:platform": "prisma generate --schema=./platform/prisma/schema.prisma",
+    "generate:school": "prisma generate --schema=./school/prisma/schema.prisma",
+    "db:push": "pnpm run db:push:platform && pnpm run db:push:school",
+    "db:push:platform": "prisma db push --schema=./platform/prisma/schema.prisma",
+    "db:push:school": "prisma db push --schema=./school/prisma/schema.prisma",
+    "migrate:platform": "prisma migrate dev --schema=./platform/prisma/schema.prisma",
+    "migrate:school": "prisma migrate dev --schema=./school/prisma/schema.prisma",
+    "migrate:deploy:platform": "prisma migrate deploy --schema=./platform/prisma/schema.prisma",
+    "migrate:deploy:school": "prisma migrate deploy --schema=./school/prisma/schema.prisma",
+    "seed": "tsx src/seed.ts",
+    "studio:platform": "prisma studio --schema=./platform/prisma/schema.prisma",
+    "studio:school": "prisma studio --schema=./school/prisma/schema.prisma"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.4.1",
+    "@xyratech/config": "workspace:*",
+    "@xyratech/permissions": "workspace:*",
+    "@xyratech/shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "prisma": "^6.4.1",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}
