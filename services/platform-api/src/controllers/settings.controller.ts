@@ -76,3 +76,4 @@ export async function updateSetting(req: Request, res: Response): Promise<void> 
     'Setting updated successfully'
   );
 }
+

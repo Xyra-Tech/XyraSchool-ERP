@@ -66,3 +66,4 @@ export async function createAnnouncement(req: Request, res: Response): Promise<v
 
   sendSuccess(res, announcement, 'Announcement published successfully', 201);
 }
+

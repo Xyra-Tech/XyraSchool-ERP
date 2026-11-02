@@ -462,3 +462,4 @@ export const OnboardingPage: React.FC = () => {
     </Box>
   );
 };
+

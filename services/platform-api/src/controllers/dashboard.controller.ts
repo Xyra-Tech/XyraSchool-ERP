@@ -139,3 +139,4 @@ export async function getDashboardMetrics(req: Request, res: Response): Promise<
     sendError(res, err.message || 'Failed to retrieve dashboard metrics', 500, 'DASHBOARD_METRICS_ERROR');
   }
 }
+
